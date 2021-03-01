@@ -523,5 +523,86 @@ variable "subnet_cidr_block" {
 ---
 ## Step 16 - Terraform AWS - Environment Variables
 
+AWS_ACCESS_KEY_ID..
 
+AWS_SECRET_ACCESS_KEY..
+
+#### the better way
+- AWS default access globaly for this user.
+```
+:~/projects/weekly31/terraform$ cat ~/.aws/credentials 
+[default]
+aws_access_key_id = A..
+aws_secret_access_key = S..
+```
+- AWS generation code was over
+```
+$ aws configure
+```
+
+#### other ways Terraform Custom Environment Variables
+
+```
+$ export TF_VAR_avail_zone="us-east-2"
+```
+
+```t
+variable avail_zone {}
+...
+      availability_zone = var.avail_zone
+
+```
+
+---
+## Step 17 - Terraform AWS - Base Project
+
+1. VPC - Create
+1. Subnet - Create
+1. Rute Tables & Internet Gateway - Create
+1. Provision EC2 Instance
+1. Deploy Docker Container with Nginx - Simple
+1. Security Group - Create ( Firewall )
+
+### Terraform: Best Practice, Create Infraestructure from Scratch!!
+
+---
+## Step 18 - Terraform AWS - VPC & Subnet
+
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+}
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = {
+    Name: "${var.env_prefix}-vpc"
+  }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {
+    Name: "${var.env_prefix}-subnet-1"
+  }
+}
+```
+
+- terraform/terraform.tfvars
+```t
+vpc_cidr_block = "10.0.0.0/16"
+subnet_cidr_block = "10.0.10.0/24"
+avail_zone = "us-east-2a"
+env_prefix = "dev"
+```
+- Create and Destroy
+```
+:~/projects/weekly31/terraform$ terraform apply -auto-approve
+:~/projects/weekly31/terraform$ terraform destroy -auto-approve
+```
 
