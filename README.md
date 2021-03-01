@@ -285,4 +285,47 @@ resource "aws_subnet" "dev-subnet-2" {
 ```
 
 ---
-## Step 10 - Terraform AWS 
+## Step 10 - Terraform AWS - non-interactive, scriptable
+
+- Auto confirm, non-interactive
+```
+:~/projects/weekly31/terraform$ terraform apply -auto-approve
+
+:~/projects/weekly31/terraform$ terraform destroy -auto-approve
+```
+
+---
+## Step 11 - Terraform AWS - State
+
+- terraform.tfstate
+- terraform.tfstate.backup
+
+```
+:~/projects/weekly31/terraform$ terraform state
+```
+
+```
+:~/projects/weekly31/terraform$ terraform state list
+data.aws_vpc.existing_vpc
+aws_subnet.dev-subnet-1
+aws_subnet.dev-subnet-2
+aws_vpc.dev-vpc
+:~/projects/weekly31/terraform$ terraform state show aws_subnet.dev-subnet-1
+# aws_subnet.dev-subnet-1:
+resource "aws_subnet" "dev-subnet-1" {
+    arn                             = "arn:aws:ec2:us-east-2:620157586684:subnet/subnet-0ff55936407cd1ee8"
+    assign_ipv6_address_on_creation = false
+    availability_zone               = "us-east-2a"
+    availability_zone_id            = "use2-az1"
+    cidr_block                      = "10.0.10.0/24"
+    id                              = "subnet-0ff55936407cd1ee8"
+    map_customer_owned_ip_on_launch = false
+    map_public_ip_on_launch         = false
+    owner_id                        = "620157586684"
+    tags                            = {
+        "Name" = "dev-subnet-1"
+    }
+    vpc_id                          = "vpc-07ca76ff9c07a2b71"
+}
+```
+
