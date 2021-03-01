@@ -498,4 +498,30 @@ env = "dev"
 ```
 
 ---
-## Step 15 - Terraform AWS - 
+## Step 15 - Terraform AWS - Variable Default Values
+
+```t
+...
+variable "subnet_cidr_block" {
+  description = "subnet cidr block"
+  default = "10.0.10.0/24"
+}
+...
+```
+---
+## Step 15 - Terraform AWS - Variable Types
+
+```t
+...
+variable "subnet_cidr_block" {
+  description = "subnet cidr block"
+  default = "10.0.10.0/24"
+  type = string
+}
+...
+```
+---
+## Step 16 - Terraform AWS - Environment Variables
+
+
+
