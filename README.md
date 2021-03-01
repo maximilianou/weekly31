@@ -329,3 +329,173 @@ resource "aws_subnet" "dev-subnet-1" {
 }
 ```
 
+---
+## Step 12 - Terraform AWS - Output
+
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+  access_key = ""
+  secret_key = ""
+}
+resource "aws_vpc" "dev-vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name: "dev",
+    vpc_env: "dev"
+  }
+}
+resource "aws_subnet" "dev-subnet-1" {
+  vpc_id = aws_vpc.dev-vpc.id
+  cidr_block = "10.0.10.0/24"
+  availability_zone = "us-east-2a"
+  tags = {
+    Name: "dev-subnet-1"
+  }
+}
+output "dev-vpc-id" {
+  value = aws_vpc.dev-vpc.id
+}
+output "dev-subnet-id" {
+  value = aws_subnet.dev-subnet-1.id
+}
+```
+- output
+```
+:~/projects/weekly31/terraform$ terraform apply -auto-approve
+aws_vpc.dev-vpc: Creating...
+aws_vpc.dev-vpc: Creation complete after 9s [id=vpc-0174caf836d3e5abf]
+aws_subnet.dev-subnet-1: Creating...
+aws_subnet.dev-subnet-1: Creation complete after 3s [id=subnet-073b7323e53780da8]
+
+Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+dev-subnet-id = "subnet-073b7323e53780da8"
+dev-vpc-id = "vpc-0174caf836d3e5abf"
+```
+
+---
+## Step 13 - Terraform AWS - Input variables
+
+- terraform/main.tf input variables
+```t
+provider "aws" {
+  region = "us-east-2"
+  access_key = ""
+  secret_key = ""
+}
+variable "subnet_cidr_block" {
+  description = "subnet cidr block"
+}
+resource "aws_vpc" "dev-vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name: "dev",
+    vpc_env: "dev"
+  }
+}
+resource "aws_subnet" "dev-subnet-1" {
+  vpc_id = aws_vpc.dev-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = "us-east-2a"
+  tags = {
+    Name: "dev-subnet-1"
+  }
+}
+```
+
+```
+:~/projects/weekly31/terraform$ terraform apply -var "subnet_cidr_block=10.0.30.0/24" -auto-approve
+```
+
+### Best Practice - Terraform Variable File terraform.tfvars
+
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+  access_key = ""
+  secret_key = ""
+}
+variable "subnet_cidr_block" {
+  description = "subnet cidr block"
+}
+resource "aws_vpc" "dev-vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name: "dev",
+    vpc_env: "dev"
+  }
+}
+resource "aws_subnet" "dev-subnet-1" {
+  vpc_id = aws_vpc.dev-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = "us-east-2a"
+  tags = {
+    Name: "dev-subnet-1"
+  }
+}
+```
+- terraform/terraform.tfvars
+```
+subnet_cidr_block = "10.0.40.0/24"
+```
+
+```
+:~/projects/weekly31/terraform$ terraform apply -auto-approve
+:~/projects/weekly31/terraform$ terraform destroy -auto-approve
+```
+
+---
+## Step 14 - Terraform AWS - Environment Config File, dev, staging, prod.
+
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+  access_key = ""
+  secret_key = ""
+}
+variable "subnet_cidr_block" {
+  description = "subnet cidr block"
+}
+variable "vpc_cidr_block" {
+  description = "vpc cidr block"
+}
+variable "env" {
+  description = "deployment environment"
+}
+resource "aws_vpc" "dev-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = {
+    Name: var.env,
+    vpc_env: "dev"
+  }
+}
+resource "aws_subnet" "dev-subnet-1" {
+  vpc_id = aws_vpc.dev-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = "us-east-2a"
+  tags = {
+    Name: "dev-subnet-1"
+  }
+}
+```
+- terraform/terraform-dev.tfvars
+```t
+subnet_cidr_block = "10.0.40.0/24"
+vpc_cidr_block = "10.0.0.0/16"
+env = "dev"
+```
+
+```
+:~/projects/weekly31/terraform$ terraform apply -var-file terraform-dev.tfvars -auto-approve
+
+:~/projects/weekly31/terraform$ terraform destroy -var-file terraform-dev.tfvars -auto-approve
+```
+
+---
+## Step 15 - Terraform AWS - 
