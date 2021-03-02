@@ -23,6 +23,7 @@
 1. **Terraform AWS - Environment Variables**
 1. **Terraform AWS - Base Project**
 1. **Terraform AWS - VPC & Subnet**
+1. **Terraform AWS - Create Route Table & Internet Gateway**
 
 ---
 
@@ -623,5 +624,70 @@ env_prefix = "dev"
 :~/projects/weekly31/terraform$ terraform apply -auto-approve
 :~/projects/weekly31/terraform$ terraform destroy -auto-approve
 ```
+
+---
+## Step 19 - Terraform AWS - Create Route Table & Internet Gateway
+
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+}
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = {
+    Name: "${var.env_prefix}-vpc"
+  }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {
+    Name: "${var.env_prefix}-subnet-1"
+  }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = {
+    Name: "${var.env_prefix}-rtb"
+  }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  tags = {
+    Name: "${var.env_prefix}-igw"
+  }
+}
+```
+
+- Create, and result
+```
+:~/projects/weekly31/terraform$ terraform apply -auto-approve
+aws_vpc.myapp-vpc: Creating...
+aws_vpc.myapp-vpc: Creation complete after 9s [id=vpc-0108b14e27b53830c]
+aws_internet_gateway.myapp-igw: Creating...
+aws_subnet.myapp-subnet-1: Creating...
+aws_subnet.myapp-subnet-1: Creation complete after 3s [id=subnet-01cab13c129b0cfc5]
+aws_internet_gateway.myapp-igw: Creation complete after 5s [id=igw-0f0f08b3b4e89392d]
+aws_route_table.myapp-route-table: Creating...
+aws_route_table.myapp-route-table: Creation complete after 4s [id=rtb-01c0552c2a50cb98a]
+
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+```
+- Clean AWS Resources
+```
+:~/projects/weekly31/terraform$ terraform destroy -auto-approve
+```
+---
+## Step 20 - Terraform AWS - 
 
 
