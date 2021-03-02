@@ -5,7 +5,25 @@
 ---
 - TOC
 ---
-1. **Terraform**
+1. **Terraform Concepts**
+1. **Terraform Install local**
+1. **Terraform Provider List**
+1. **Terraform Provider connect with AWS**
+1. **Terraform Provider Install AWS**
+1. **Terraform AWS**
+1. **Terraform AWS - Create VPC - private net/subnet**
+1. **Terraform AWS - Data Sources**
+1. **Terraform AWS - Change Resources**
+1. **Terraform AWS - non-interactive, scriptable**
+1. **Terraform AWS - State**
+1. **Terraform AWS - Output**
+1. **Terraform AWS - Input variables**
+1. **Terraform AWS - Environment Config File, dev, staging, prod.**
+1. **Terraform AWS - Variable Types**
+1. **Terraform AWS - Environment Variables**
+1. **Terraform AWS - Base Project**
+1. **Terraform AWS - VPC & Subnet**
+
 ---
 
 ---
@@ -605,4 +623,5 @@ env_prefix = "dev"
 :~/projects/weekly31/terraform$ terraform apply -auto-approve
 :~/projects/weekly31/terraform$ terraform destroy -auto-approve
 ```
+
 
