@@ -24,6 +24,7 @@
 1. **Terraform AWS - Base Project**
 1. **Terraform AWS - VPC & Subnet**
 1. **Terraform AWS - Create Route Table & Internet Gateway**
+1. **Terraform AWS - Route Table Association**
 
 ---
 
@@ -688,6 +689,72 @@ Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 :~/projects/weekly31/terraform$ terraform destroy -auto-approve
 ```
 ---
-## Step 20 - Terraform AWS - 
+## Step 20 - Terraform AWS - Route Table Association
 
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+}
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = {
+    Name: "${var.env_prefix}-vpc"
+  }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {
+    Name: "${var.env_prefix}-subnet-1"
+  }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = {
+    Name: "${var.env_prefix}-rtb"
+  }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  tags = {
+    Name: "${var.env_prefix}-igw"
+  }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+```
+- Create AWS Resources, Terraform Apply
+```
+:~/projects/weekly31/terraform$ terraform apply --auto-approve
+aws_vpc.myapp-vpc: Creating...
+aws_vpc.myapp-vpc: Still creating... [10s elapsed]
+aws_vpc.myapp-vpc: Still creating... [20s elapsed]
+aws_vpc.myapp-vpc: Creation complete after 20s [id=vpc-09ab4467b1c391489]
+aws_internet_gateway.myapp-igw: Creating...
+aws_subnet.myapp-subnet-1: Creating...
+aws_subnet.myapp-subnet-1: Creation complete after 3s [id=subnet-0682240329ac990ad]
+aws_internet_gateway.myapp-igw: Creation complete after 5s [id=igw-036a3d630f8cd3758]
+aws_route_table.myapp-route-table: Creating...
+aws_route_table.myapp-route-table: Creation complete after 5s [id=rtb-0d0748b97c09641f7]
+aws_route_table_association.a-rtb-subnet: Creating...
+aws_route_table_association.a-rtb-subnet: Creation complete after 2s [id=rtbassoc-0effeeae45c939d4e]
+
+Apply complete! Resources: 5 added, 0 changed, 0 destroyed.
+```
+- Clean AWS resources
+```
+:~/projects/weekly31/terraform$ terraform destroy --auto-approve
+```
 
