@@ -2,6 +2,10 @@
 
 ## Terraform - AWS 
 
+**Create Infrastrcture in Any Cloud, AWS ( Linode, Azure, GCP, Digital Ocean, IBM )**
+
+*Write Text Config File*
+
 ---
 - TOC
 ---
@@ -26,7 +30,9 @@
 1. **Terraform AWS - Create Route Table & Internet Gateway**
 1. **Terraform AWS - Route Table Association**
 1. **Terraform AWS - Security Group**
-
+1. **Terraform AWS - Obtain Imange Id Dinamically from AWS**
+1. **Terraform AWS - EC2 Instance - Virtual Machine Instance**
+1. **Terraform AWS - SSH Key Pair Automatically Created**
 ---
 
 ---
@@ -833,5 +839,233 @@ resource "aws_security_group" "myapp-sg" {
   tags = { Name: "${var.env_prefix}-sg" }
 }
 ```
+- Create AWS Resources, Terraform Apply
+```
+:~/projects/weekly31/terraform$ terraform apply --auto-approve
+aws_vpc.myapp-vpc: Creating...
+aws_vpc.myapp-vpc: Creation complete after 10s [id=vpc-055f4424f5c9d6e4a]
+aws_internet_gateway.myapp-igw: Creating...
+aws_subnet.myapp-subnet-1: Creating...
+aws_security_group.myapp-sg: Creating...
+aws_subnet.myapp-subnet-1: Creation complete after 3s [id=subnet-0cdda69b8346374aa]
+aws_internet_gateway.myapp-igw: Creation complete after 4s [id=igw-0246b73e2db31e0ee]
+aws_route_table.myapp-route-table: Creating...
+aws_security_group.myapp-sg: Creation complete after 7s [id=sg-0a6153d7c860ff6f7]
+aws_route_table.myapp-route-table: Creation complete after 4s [id=rtb-0c804a1710aa074e7]
+aws_route_table_association.a-rtb-subnet: Creating...
+aws_route_table_association.a-rtb-subnet: Creation complete after 1s [id=rtbassoc-06b86135af1cee7e3]
+
+Apply complete! Resources: 6 added, 0 changed, 0 destroyed.
+```
+- Clean AWS resources
+```
+:~/projects/weekly31/terraform$ terraform destroy --auto-approve
+```
+
 ---
-## Step 22 - Terraform AWS - 
+## Step 22 - Terraform AWS - Obtain Imange Id Dinamically from AWS
+
+- terraform/main.tf test ami data value obtained dinamically
+```t
+provider "aws" {
+  region = "us-east-2"
+}
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable my_ip {}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = { Name: "${var.env_prefix}-vpc" }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {  Name: "${var.env_prefix}-subnet-1" }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = { Name: "${var.env_prefix}-rtb" }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  tags = { Name: "${var.env_prefix}-igw" }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+resource "aws_security_group" "myapp-sg" {
+  name = "myapp-sg"
+  vpc_id = aws_vpc.myapp-vpc.id
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    prefix_list_ids = []
+  }
+  tags = { Name: "${var.env_prefix}-sg" }
+}
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners = ["amazon"]
+  filter {
+    name = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+output "aws_ami_id" {
+  value = data.aws_ami.latest-amazon-linux-image.id
+}
+/*resource "aws_instance" "myapp-server" {
+  ami = data.aws_ami.latest-amazon-linux-image.id
+}*/
+```
+- Test AWS Image Id Dinamically Obtained 
+```
+:~/projects/weekly31/terraform$ terraform plan
+
+...
+Changes to Outputs:
+  + aws_ami_id = "ami-09246ddb00c7c4fef"
+
+```
+
+---
+## Step 23 - Terraform AWS - EC2 Instance - Virtual Machine Instance
+
+- **In AWS Console - Create and Download Key Pair .pem file to have ssh access**
+- **mv ~/Downloads/aws-server-key-pair.pem ~/.ssh**
+- **chmod 400 ~/.ssh/aws-server-key-pair.pem**
+- **-r--------   aws-server-key-pair.pem**
+
+- terraform/main.tf
+```t
+provider "aws" {
+  region = "us-east-2"
+}
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable my_ip {}
+variable instance_type {}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = { Name: "${var.env_prefix}-vpc" }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {  Name: "${var.env_prefix}-subnet-1" }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = { Name: "${var.env_prefix}-rtb" }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  tags = { Name: "${var.env_prefix}-igw" }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+resource "aws_security_group" "myapp-sg" {
+  name = "myapp-sg"
+  vpc_id = aws_vpc.myapp-vpc.id
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    prefix_list_ids = []
+  }
+  tags = { Name: "${var.env_prefix}-sg" }
+}
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners = ["amazon"]
+  filter {
+    name = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+output "aws_ami_id" {
+  value = data.aws_ami.latest-amazon-linux-image
+}
+resource "aws_instance" "myapp-server" {
+  ami = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  vpc_security_group_ids = [ aws_security_group.myapp-sg.id ]
+  availability_zone = var.avail_zone
+  associate_public_ip_address = true
+  key_name = "aws-server-key-pair"
+  tags = { Name: "${var.env_prefix}-server" }
+}
+```
+
+- ssh access ( using ssh credentials public .pem file created UI AWS Console )
+```
+:~/projects/weekly31/terraform$ ssh -i ~/.ssh/aws-server-key-pair.pem ec2-user@3.135.218.233
+The authenticity of host '3.135.218.233 (3.135.218.233)' can't be established.
+ECDSA key fingerprint is SHA256:6KJ9uOKJ4SvAWEieJ3M+oLBY/UAd79Orq1RS44J2fDI.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '3.135.218.233' (ECDSA) to the list of known hosts.
+
+       __|  __|_  )
+       _|  (     /   Amazon Linux 2 AMI
+      ___|\___|___|
+
+https://aws.amazon.com/amazon-linux-2/
+[ec2-user@ip-10-0-10-198 ~]$ 
+```
+
+---
+## Step 23 - Terraform AWS - SSH Key Pair Automatically Created
+
