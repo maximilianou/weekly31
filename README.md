@@ -1177,7 +1177,7 @@ resource "aws_instance" "myapp-server" {
   tags = { Name: "${var.env_prefix}-server" }
 }
 ```
-- ssh access server default ssh keys local user.
+- ssh verbose access server default ssh keys local user.
 ```js
 aws_ec2_public_ip = "3.15.143.45"
 :~/projects/weekly31/terraform$ ssh -vvv -i ~/.ssh/id_rsa ec2-user@3.15.143.45
@@ -1190,6 +1190,153 @@ aws_ec2_public_ip = "3.15.143.45"
 https://aws.amazon.com/amazon-linux-2/
 [ec2-user@ip-10-0-10-210 ~]$ 
 ```
+- ssh default local
+```js
+:~/projects/weekly31/terraform$ ssh ec2-user@3.15.143.45
+Last login: Wed Mar  3 19:26:35 2021 from 181.44.61.193
+
+       __|  __|_  )
+       _|  (     /   Amazon Linux 2 AMI
+      ___|\___|___|
+
+https://aws.amazon.com/amazon-linux-2/
+[ec2-user@ip-10-0-10-210 ~]$ exit
+logout
+Connection to 3.15.143.45 closed.
+```
 
 ---
-## Step 24 - Terraform AWS - 
+---
+## Step 24 - Terraform AWS - AWS EC2 docker install - run nginx
+
+- terraform/main.tf
+```js
+provider "aws" {
+  region = "us-east-2"
+}
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable my_ip {}
+variable instance_type {}
+variable my_public_key_location {}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = { Name: "${var.env_prefix}-vpc" }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {  Name: "${var.env_prefix}-subnet-1" }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = { Name: "${var.env_prefix}-rtb" }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  tags = { Name: "${var.env_prefix}-igw" }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+resource "aws_security_group" "myapp-sg" {
+  name = "myapp-sg"
+  vpc_id = aws_vpc.myapp-vpc.id
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    prefix_list_ids = []
+  }
+  tags = { Name: "${var.env_prefix}-sg" }
+}
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners = ["amazon"]
+  filter {
+    name = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+output "aws_ami_id" {
+  value = data.aws_ami.latest-amazon-linux-image
+}
+output "aws_ec2_public_ip" {
+  value = aws_instance.myapp-server.public_ip
+}
+resource "aws_key_pair" "ssh-key" {
+  key_name = "aws-server-key"
+  public_key = file(var.my_public_key_location)
+}
+resource "aws_instance" "myapp-server" {
+  ami = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  vpc_security_group_ids = [ aws_security_group.myapp-sg.id ]
+  availability_zone = var.avail_zone
+  associate_public_ip_address = true
+  key_name = aws_key_pair.ssh-key.key_name
+  user_data = <<EOF
+                  #!/bin/bash
+                  sudo yum -y update && sudo yum -y install docker
+                  sudo systemctl start docker
+                  sudo usermod -aG docker ec2-user
+                  docker run -p 8080:80 nginx 
+
+              EOF
+  tags = { Name: "${var.env_prefix}-server" }
+}
+```
+
+```
+:~/projects/weekly31/terraform$ terraform apply --auto-approve
+```
+
+```
+aws_ec2_public_ip = "3.16.50.58"
+:~/projects/weekly31/terraform$ ssh ec2-user@3.16.50.58
+Last login: Wed Mar  3 20:30:01 2021 from 181.44.61.193
+
+       __|  __|_  )
+       _|  (     /   Amazon Linux 2 AMI
+      ___|\___|___|
+
+https://aws.amazon.com/amazon-linux-2/
+[ec2-user@ip-10-0-10-183 ~]$ docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED              STATUS              PORTS                  NAMES
+2bc93973a6cb        nginx               "/docker-entrypoint.…"   About a minute ago   Up About a minute   0.0.0.0:8080->80/tcp   gifted_fermat
+```
+- http://3.16.50.58:8080/
+
+```
+:~/projects/weekly31/terraform$ terraform destroy --auto-approve
+```
+
+---
+## Step 25 - Terraform AWS - 
+
