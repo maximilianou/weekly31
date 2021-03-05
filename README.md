@@ -35,6 +35,8 @@
 1. **Terraform AWS - SSH Key Pair Automatically Created**
 1. **Terraform AWS - AWS EC2 docker install - run nginx - Web**
 1. **Terraform AWS - AWS EC2 entry-script.sh exec in container**
+1. **Terraform AWS - Modules**
+1. **Terraform AWS - Modules terraform/modules**
 ---
 
 ---
@@ -1448,4 +1450,447 @@ docker run -p 8080:80 nginx
 ```
 
 ---
-## Step 26 - Terraform AWS - 
+## Step 26 - Terraform AWS - Provisioners
+
+- Usage is not recommended by Terraform
+
+---
+## Step 27 - Terraform AWS - Modules
+
+https://registry.terraform.io/browse/modules
+
+- terraform/main.tf
+```js
+provider "aws" {
+  region = "us-east-2"
+}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = { Name: "${var.env_prefix}-vpc" }
+}
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {  Name: "${var.env_prefix}-subnet-1" }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = { Name: "${var.env_prefix}-rtb" }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  tags = { Name: "${var.env_prefix}-igw" }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+resource "aws_security_group" "myapp-sg" {
+  name = "myapp-sg"
+  vpc_id = aws_vpc.myapp-vpc.id
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    prefix_list_ids = []
+  }
+  tags = { Name: "${var.env_prefix}-sg" }
+}
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners = ["amazon"]
+  filter {
+    name = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+resource "aws_key_pair" "ssh-key" {
+  key_name = "aws-server-key"
+  public_key = file(var.my_public_key_location)
+}
+resource "aws_instance" "myapp-server" {
+  ami = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  vpc_security_group_ids = [ aws_security_group.myapp-sg.id ]
+  availability_zone = var.avail_zone
+  associate_public_ip_address = true
+  key_name = aws_key_pair.ssh-key.key_name
+  user_data = file("entry-script.sh")
+  tags = { Name: "${var.env_prefix}-server" }
+}
+```
+- terraform/variables.tf
+```js
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable my_ip {}
+variable instance_type {}
+variable my_public_key_location {}
+variable my_private_key_location {}
+```
+- terraform/providers.tf
+```js
+
+```
+- terraform/outputs.tf
+```js
+output "aws_ami_id" {
+  value = data.aws_ami.latest-amazon-linux-image
+}
+output "aws_ec2_public_ip" {
+  value = aws_instance.myapp-server.public_ip
+}
+```
+
+```
+:~/projects/weekly31/terraform$ terraform apply --auto-approve
+```
+
+```
+:~/projects/weekly31/terraform$ terraform destroy --auto-approve
+```
+
+---
+## Step 28 - Terraform AWS - Modules terraform/modules
+
+- Create folder **modules**
+
+```
+:~/projects/weekly31/terraform$ mkdir -p modules/subnet
+:~/projects/weekly31/terraform$ mkdir modules/webserver
+:~/projects/weekly31/terraform$ touch modules/webserver/outputs.tf
+:~/projects/weekly31/terraform$ touch modules/webserver/main.tf
+:~/projects/weekly31/terraform$ touch modules/webserver/variables.tf
+:~/projects/weekly31/terraform$ touch modules/subnet/outputs.tf
+:~/projects/weekly31/terraform$ touch modules/subnet/main.tf
+:~/projects/weekly31/terraform$ touch modules/subnet/variables.tf
+```
+
+- terraform/main.tf
+```js
+provider "aws" {
+  region = "us-east-2"
+}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = { Name: "${var.env_prefix}-vpc" }
+}
+module "myapp-subnet" {
+  source = "./modules/subnet"
+  subnet_cidr_block = var.subnet_cidr_block
+  avail_zone = var.avail_zone
+  env_prefix = var.env_prefix
+  vpc_id = aws_vpc.myapp-vpc.id
+}
+resource "aws_security_group" "myapp-sg" {
+  name = "myapp-sg"
+  vpc_id = aws_vpc.myapp-vpc.id
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    prefix_list_ids = []
+  }
+  tags = { Name: "${var.env_prefix}-sg" }
+}
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners = ["amazon"]
+  filter {
+    name = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+resource "aws_key_pair" "ssh-key" {
+  key_name = "aws-server-key"
+  public_key = file(var.my_public_key_location)
+}
+resource "aws_instance" "myapp-server" {
+  ami = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+  subnet_id = module.myapp-subnet.subnet.id
+  vpc_security_group_ids = [ aws_security_group.myapp-sg.id ]
+  availability_zone = var.avail_zone
+  associate_public_ip_address = true
+  key_name = aws_key_pair.ssh-key.key_name
+  user_data = file("entry-script.sh")
+  tags = { Name: "${var.env_prefix}-server" }
+}
+```
+- terraform/subnet/main.tf
+```js
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = var.vpc_id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {  Name: "${var.env_prefix}-subnet-1" }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = var.vpc_id
+  tags = { Name: "${var.env_prefix}-igw" }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = var.vpc_id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = { Name: "${var.env_prefix}-rtb" }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+```
+- terraform/subnet/variables.tf
+```js
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable vpc_id {}
+```
+- terraform/subnet/outputs.tf
+```js
+output "subnet" {
+  value = aws_subnet.myapp-subnet-1
+}
+```
+
+```
+:~/projects/weekly31/terraform$ terraform init
+:~/projects/weekly31/terraform$ terraform plan
+:~/projects/weekly31/terraform$ terraform apply --auto-approve
+:~/projects/weekly31/terraform$ terraform destroy --auto-approve
+```
+
+---
+## Step 29 - Terraform AWS - Modules 
+
+- terraform/main.tf
+```js
+provider "aws" {
+  region = "us-east-2"
+}
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags = { Name: "${var.env_prefix}-vpc" }
+}
+module "myapp-subnet" {
+  source = "./modules/subnet"
+  subnet_cidr_block = var.subnet_cidr_block
+  avail_zone = var.avail_zone
+  env_prefix = var.env_prefix
+  vpc_id = aws_vpc.myapp-vpc.id
+}
+
+module "myapp-server" {
+  source = "./modules/webserver"
+  vpc_id = aws_vpc.myapp-vpc.id
+  my_ip = var.my_ip
+  my_public_key_location = var.my_public_key_location
+  instance_type = var.instance_type
+  image_name = var.image_name
+  subnet_id = module.myapp-subnet.subnet.id
+  avail_zone = var.avail_zone
+  env_prefix = var.env_prefix
+}
+```
+- terraform/variables.tf
+```js
+variable vpc_cidr_block {}
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable my_ip {}
+variable instance_type {}
+variable my_public_key_location {}
+variable my_private_key_location {}
+variable image_name {}
+```
+- terraform/outputs.tf
+```js
+output "aws_ec2_public_ip" {
+  value = module.myapp-server.instance.public_ip
+}
+```
+- terraform/terraform.tfvars
+```js
+vpc_cidr_block = "10.0.0.0/16"
+subnet_cidr_block = "10.0.10.0/24"
+avail_zone = "us-east-2a"
+env_prefix = "dev"
+my_ip = "181.44.61.193/32"
+instance_type = "t2.micro"
+my_public_key_location = "/home/maximilianou/.ssh/id_rsa.pub"
+my_private_key_location = "/home/maximilianou/.ssh/id_rsa"
+image_name = "amzn2-ami-hvm-*-x86_64-gp2"
+```
+- terraform/modules/subnet/main.tf
+```js
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = var.vpc_id
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
+  tags = {  Name: "${var.env_prefix}-subnet-1" }
+}
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = var.vpc_id
+  tags = { Name: "${var.env_prefix}-igw" }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = var.vpc_id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = { Name: "${var.env_prefix}-rtb" }
+}
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
+}
+```
+- terraform/modules/subnet/variables.tf
+```js
+variable subnet_cidr_block {}
+variable avail_zone {}
+variable env_prefix {}
+variable vpc_id {}
+```
+- terraform/modules/subnet/outputs.tf
+```js
+output "subnet" {
+  value = aws_subnet.myapp-subnet-1
+}
+```
+- terraform/modules/webserver/main.tf
+```js
+resource "aws_security_group" "myapp-sg" {
+  name = "myapp-sg"
+  vpc_id = var.vpc_id
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    prefix_list_ids = []
+  }
+  tags = { Name: "${var.env_prefix}-sg" }
+}
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners = ["amazon"]
+  filter {
+    name = "name"
+    values = [var.image_name]
+  }
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+resource "aws_key_pair" "ssh-key" {
+  key_name = "aws-server-key"
+  public_key = file(var.my_public_key_location)
+}
+resource "aws_instance" "myapp-server" {
+  ami = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+  subnet_id = var.subnet_id
+  vpc_security_group_ids = [ aws_security_group.myapp-sg.id ]
+  availability_zone = var.avail_zone
+  associate_public_ip_address = true
+  key_name = aws_key_pair.ssh-key.key_name
+  user_data = file("./modules/webserver/entry-script.sh")
+  tags = { Name: "${var.env_prefix}-server" }
+}
+```
+- terraform/modules/webserver/variables.tf
+```js
+variable vpc_id {}
+variable my_ip {}
+variable my_public_key_location {}
+variable instance_type {}
+variable subnet_id {}
+variable avail_zone {}
+variable env_prefix {} 
+variable image_name {}
+```
+- terraform/modules/webserver/outputs.tf
+```js
+output "instance" {
+  value = aws_instance.myapp-server
+}
+```
+- terraform/modules/webserver/entry-script.sh
+```js
+#!/bin/bash
+sudo yum -y update && sudo yum -y install docker
+sudo systemctl start docker
+sudo usermod -aG docker ec2-user
+docker run -p 8080:80 nginx
+```
+
+```
+:~/projects/weekly31/terraform$ terraform apply --auto-approve
+```
+```
+:~/projects/weekly31/terraform$ terraform destroy --auto-approve
+```
+
+---
+## Step 30 - Terraform AWS - 
