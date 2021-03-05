@@ -6,3 +6,5 @@ variable my_ip {}
 variable instance_type {}
 variable my_public_key_location {}
 variable my_private_key_location {}
+variable image_name {}
+
