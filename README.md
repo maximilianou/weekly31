@@ -2,6 +2,9 @@
 
 ## Terraform - AWS 
 
+[![(https://github.com/maximilianou/weekly31/)](https://raw.githubusercontent.com/maximilianou/weekly31/main/CompleteTerraformFromBeginerToAdvaceHandOnAWS.jpg)](https://github.com/maximilianou/weekly31/)
+
+
 **Create Infrastrcture in Any Cloud, AWS ( Linode, Azure, GCP, Digital Ocean, IBM )**
 
 *Write Text Config File*
