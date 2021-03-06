@@ -1706,7 +1706,7 @@ output "subnet" {
 ```
 
 ---
-## Step 29 - Terraform AWS - Modules 
+## Step 29 - Terraform AWS - Modules - Creating your Own Modules
 
 - terraform/main.tf
 ```js
@@ -1893,4 +1893,7 @@ docker run -p 8080:80 nginx
 ```
 
 ---
-## Step 30 - Terraform AWS - 
+## Step 30 - Terraform AWS - Modules Providers
+
+https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws/latest
+
